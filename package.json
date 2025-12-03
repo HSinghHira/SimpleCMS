@@ -1,5 +1,6 @@
 {
   "name": "markdown-editor",
+  "homepage": "https://simplecms.hira.im",
   "private": true,
   "version": "0.0.0",
   "type": "module",
