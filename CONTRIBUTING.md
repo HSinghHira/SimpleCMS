@@ -103,5 +103,5 @@ Every merged contributor gets:
 
 Let’s keep **Simple CMS** the simplest, most privacy-friendly Markdown + frontmatter editor out there — together!
 
-— Harman Singh Hira ([@hsinghhira](https://hsinghhira.me))
+— Harman Singh Hira ([@hsinghhira](https://me.hsinghhira.me))
 
