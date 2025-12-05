@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { Plus, Trash2, X } from "lucide-react";
+import { Folder, Link, Pencil, Plus, Trash2, X } from "lucide-react";
 import AddFrontmatterPopup from "./components/AddFrontmatterPopup";
+import { Type, ToggleLeft, Calendar, List, Package, Hash } from "lucide-react";
 const Aside = ({
   frontmatter,
   updateFrontmatterField,
@@ -9,46 +10,72 @@ const Aside = ({
   updateArrayItem,
   deleteArrayItem,
   addObjectArrayItem,
-  updateObjectArrayItem
+  updateObjectArrayItem,
 }) => {
   const [isAddPopupOpen, setIsAddPopupOpen] = useState(false);
+  const [fieldTypesMetadata, setFieldTypesMetadata] = useState({});
+
   const handleAddField = (key, value, type = "string") => {
     if (frontmatter.hasOwnProperty(key)) {
       alert(`Field "${key}" already exists!`);
       return;
     }
     updateFrontmatterField(key, value);
+    setFieldTypesMetadata((prev) => ({ ...prev, [key]: type }));
     setIsAddPopupOpen(false);
   };
- const renderFrontmatterField = (key, value) => {
+  const renderFrontmatterField = (key, value) => {
+  const fieldType = fieldTypesMetadata[key];
+
   // 1. Boolean → Checkbox
-  if (typeof value === "boolean") {
+  if (typeof value === "boolean" || fieldType === "boolean") {
     return (
       <div className="field-group">
-        <label className="checkbox-container">
-          <input
-            type="checkbox"
-            checked={value}
-            onChange={(e) => updateFrontmatterField(key, e.target.checked)}
-            className="checkbox"
-          />
-          <span className="checkbox-label">{key}</span>
-        </label>
+        <div className="field-header">
+          <label className="checkbox-container">
+            <input
+              type="checkbox"
+              checked={value || false}
+              onChange={(e) => updateFrontmatterField(key, e.target.checked)}
+              className="checkbox"
+            />
+            <span className="checkbox-label">{key}</span>
+          </label>
+          <button
+            onClick={() => {
+              deleteFrontmatterField(key);
+              setFieldTypesMetadata(prev => {
+                const { [key]: _, ...rest } = prev;
+                return rest;
+              });
+            }}
+            className="delete-field-btn"
+            title="Delete field"
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
       </div>
     );
   }
 
-  // 2. Object (nested, like [params] or [image]) → Object editor
+  // 2. Object (nested) → Object editor
   if (typeof value === "object" && value !== null && !Array.isArray(value)) {
     return (
       <div className="field-group">
         <div className="field-header">
           <label className="field-label">
-            <span className="field-icon">Folder</span>
+            <span className="field-icon"><Folder size={18} /></span>
             {key}
           </label>
           <button
-            onClick={() => deleteFrontmatterField(key)}
+            onClick={() => {
+              deleteFrontmatterField(key);
+              setFieldTypesMetadata(prev => {
+                const { [key]: _, ...rest } = prev;
+                return rest;
+              });
+            }}
             className="delete-field-btn"
             title="Delete field"
           >
@@ -91,27 +118,38 @@ const Aside = ({
     );
   }
 
-  // 3. Array (tags or array of objects)
+  // 3. Array
   if (Array.isArray(value)) {
-    const isObjectArray = value.length > 0 && typeof value[0] === "object" && value[0] !== null;
+    const isObjectArray =
+      value.length > 0 && typeof value[0] === "object" && value[0] !== null;
 
     return (
       <div className="field-group">
         <div className="field-header">
           <label className="field-label">
-            <span className="field-icon">{isObjectArray ? "Package" : "Tag"}</span>
+            <span className="field-icon">
+              {isObjectArray ? <List size={18} /> : <Package size={18} />}
+            </span>
             {key}
           </label>
           <div className="field-actions">
             <button
-              onClick={() => (isObjectArray ? addObjectArrayItem(key) : addArrayItem(key))}
+              onClick={() =>
+                isObjectArray ? addObjectArrayItem(key) : addArrayItem(key)
+              }
               className="add-btn"
               title="Add item"
             >
               <Plus size={14} />
             </button>
             <button
-              onClick={() => deleteFrontmatterField(key)}
+              onClick={() => {
+                deleteFrontmatterField(key);
+                setFieldTypesMetadata(prev => {
+                  const { [key]: _, ...rest } = prev;
+                  return rest;
+                });
+              }}
               className="delete-field-btn"
               title="Delete entire field"
             >
@@ -122,7 +160,10 @@ const Aside = ({
 
         <div className={isObjectArray ? "array-container" : "tags-container"}>
           {value.map((item, index) => (
-            <div key={index} className={isObjectArray ? "object-card" : "tag-item"}>
+            <div
+              key={index}
+              className={isObjectArray ? "object-card" : "tag-item"}
+            >
               {isObjectArray ? (
                 <>
                   <div className="object-card-header">
@@ -142,7 +183,12 @@ const Aside = ({
                         type="text"
                         value={val || ""}
                         onChange={(e) =>
-                          updateObjectArrayItem(key, index, field, e.target.value)
+                          updateObjectArrayItem(
+                            key,
+                            index,
+                            field,
+                            e.target.value
+                          )
                         }
                         placeholder={`Enter ${field}`}
                         className="input input-sm"
@@ -155,7 +201,9 @@ const Aside = ({
                   <input
                     type="text"
                     value={item}
-                    onChange={(e) => updateArrayItem(key, index, e.target.value)}
+                    onChange={(e) =>
+                      updateArrayItem(key, index, e.target.value)
+                    }
                     className="tag-input"
                     placeholder="Tag name"
                   />
@@ -175,38 +223,88 @@ const Aside = ({
     );
   }
 
-  // 4. Date fields → datetime-local input
-  if (/\b(date|time|published|updated|created)\b/i.test(key) || key.toLowerCase().includes("date")) {
-    const isoValue = value && typeof value === "string" ? value : new Date().toISOString().slice(0, 16);
+  // 4. Date fields
+  if (
+    fieldType === "date" ||
+    /\b(date|time|published|updated|created)\b/i.test(key) ||
+    key.toLowerCase().includes("date")
+  ) {
+    const isoValue =
+      value && typeof value === "string"
+        ? value
+        : new Date().toISOString().slice(0, 16);
     return (
       <div className="field-group">
-        <label className="field-label">
-          <span className="field-icon">Calendar</span>
-          {key}
-        </label>
+        <div className="field-header">
+          <label className="field-label">
+            <span className="field-icon">
+              <Calendar size={18} />
+            </span>
+            {key}
+          </label>
+          <button
+            onClick={() => {
+              deleteFrontmatterField(key);
+              setFieldTypesMetadata(prev => {
+                const { [key]: _, ...rest } = prev;
+                return rest;
+              });
+            }}
+            className="delete-field-btn"
+            title="Delete field"
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
+
         <input
           type="datetime-local"
           value={isoValue.slice(0, 16)}
-          onChange={(e) => updateFrontmatterField(key, new Date(e.target.value).toISOString())}
+          onChange={(e) =>
+            updateFrontmatterField(
+              key,
+              new Date(e.target.value).toISOString()
+            )
+          }
           className="input"
         />
       </div>
     );
   }
 
-  // 5. Long text fields (description, excerpt, bio, etc.) → textarea
+  // 5. Multiline text fields
   if (
+    fieldType === "multiline" ||
     key.toLowerCase().includes("description") ||
     key.toLowerCase().includes("excerpt") ||
     key.toLowerCase().includes("bio") ||
+    key.toLowerCase().includes("content") ||
+    key.toLowerCase().includes("summary") ||
     (typeof value === "string" && value.length > 120)
   ) {
     return (
       <div className="field-group">
-        <label className="field-label">
-          <span className="field-icon">Document</span>
-          {key}
-        </label>
+        <div className="field-header">
+          <label className="field-label">
+            <span className="field-icon">
+              <Type size={18} />
+            </span>
+            {key}
+          </label>
+          <button
+            onClick={() => {
+              deleteFrontmatterField(key);
+              setFieldTypesMetadata(prev => {
+                const { [key]: _, ...rest } = prev;
+                return rest;
+              });
+            }}
+            className="delete-field-btn"
+            title="Delete field"
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
         <textarea
           value={value || ""}
           onChange={(e) => updateFrontmatterField(key, e.target.value)}
@@ -218,14 +316,38 @@ const Aside = ({
     );
   }
 
-  // 6. URL-like fields
-  if (key.toLowerCase().includes("url") || key.toLowerCase().includes("link") || key.toLowerCase().includes("image")) {
+  // 6. URL fields
+  if (
+    fieldType === "url" ||
+    key.toLowerCase().includes("url") ||
+    key.toLowerCase().includes("link") ||
+    key.toLowerCase().includes("image") ||
+    key.toLowerCase().includes("href") ||
+    key.toLowerCase().includes("src")
+  ) {
     return (
       <div className="field-group">
-        <label className="field-label">
-          <span className="field-icon">Link</span>
-          {key}
-        </label>
+        <div className="field-header">
+          <label className="field-label">
+            <span className="field-icon">
+              <Link size={18} />
+            </span>
+            {key}
+          </label>
+          <button
+            onClick={() => {
+              deleteFrontmatterField(key);
+              setFieldTypesMetadata(prev => {
+                const { [key]: _, ...rest } = prev;
+                return rest;
+              });
+            }}
+            className="delete-field-btn"
+            title="Delete field"
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
         <input
           type="url"
           value={value || ""}
@@ -237,13 +359,30 @@ const Aside = ({
     );
   }
 
-  // 7. Default: text input
+  // 7. Default text input
   return (
     <div className="field-group">
-      <label className="field-label">
-        <span className="field-icon">Pencil</span>
-        {key}
-      </label>
+      <div className="field-header">
+        <label className="field-label">
+          <span className="field-icon">
+            <Pencil size={18} />
+          </span>
+          {key}
+        </label>
+        <button
+          onClick={() => {
+            deleteFrontmatterField(key);
+            setFieldTypesMetadata(prev => {
+              const { [key]: _, ...rest } = prev;
+              return rest;
+            });
+          }}
+          className="delete-field-btn"
+          title="Delete field"
+        >
+          <Trash2 size={14} />
+        </button>
+      </div>
       <input
         type="text"
         value={value || ""}
@@ -254,7 +393,8 @@ const Aside = ({
     </div>
   );
 };
-  return <aside className="sidebar">
+  return (
+    <aside className="sidebar">
       <div className="sidebar-card">
         <div className="sidebar-header">
           <div>
@@ -263,25 +403,43 @@ const Aside = ({
               {Object.keys(frontmatter).length} fields
             </p>
           </div>
-          <button onClick={() => setIsAddPopupOpen(true)} className="add-field-btn" title="Add field">
+          <button
+            onClick={() => setIsAddPopupOpen(true)}
+            className="add-field-btn"
+            title="Add field"
+          >
             <Plus size={18} />
           </button>
         </div>
 
         <div className="frontmatter-fields">
-          {Object.keys(frontmatter).length === 0 ? <div className="empty-state">
+          {Object.keys(frontmatter).length === 0 ? (
+            <div className="empty-state">
               <p>No frontmatter fields yet.</p>
-              <button onClick={() => setIsAddPopupOpen(true)} className="btn-link">
+              <button
+                onClick={() => setIsAddPopupOpen(true)}
+                className="btn-link"
+              >
                 Add your first field
               </button>
-            </div> : Object.entries(frontmatter).map(([key, value]) => <div key={key} className="frontmatter-field">
+            </div>
+          ) : (
+            Object.entries(frontmatter).map(([key, value]) => (
+              <div key={key} className="frontmatter-field">
                 {renderFrontmatterField(key, value)}
-              </div>)}
+              </div>
+            ))
+          )}
         </div>
       </div>
 
       {}
-      <AddFrontmatterPopup isOpen={isAddPopupOpen} onClose={() => setIsAddPopupOpen(false)} onAdd={handleAddField} />
-    </aside>;
+      <AddFrontmatterPopup
+        isOpen={isAddPopupOpen}
+        onClose={() => setIsAddPopupOpen(false)}
+        onAdd={handleAddField}
+      />
+    </aside>
+  );
 };
 export default Aside;
